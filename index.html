@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapping the Robotics Landscape</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23F7F7F4'/%3E%3Cpath d='M32 8v48M8 32h48' stroke='%23a9b6b1' stroke-width='3'/%3E%3Ccircle cx='20' cy='20' r='6' fill='%23C2703D'/%3E%3Ccircle cx='44' cy='20' r='6' fill='%233B6EA5'/%3E%3Ccircle cx='20' cy='44' r='6' fill='%233E7A52'/%3E%3Ccircle cx='44' cy='44' r='6' fill='%237A5BA6'/%3E%3C/svg%3E">
+<style>
+  :root { color-scheme: light; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background:#F7F7F4; color:#1c1c1c; -webkit-font-smoothing:antialiased;
+  }
+  b,num { font-weight:700; }
+  .num { color:#B4551F; font-weight:700; }
+
+  /* ---------- header ---------- */
+  header { padding:30px 44px 6px; }
+  header h1 { font-size:30px; font-weight:800; letter-spacing:-.5px; }
+  header h1 .zh { font-size:19px; font-weight:600; color:#6b6b66; margin-left:12px; letter-spacing:0; }
+  header .sub { margin-top:8px; font-size:13.5px; color:#77776f; }
+  .toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:16px 44px 4px; }
+  .legend { display:flex; align-items:center; gap:6px; font-size:12px; color:#55554f; background:#fff;
+            border:1px solid #e4e4df; border-radius:999px; padding:5px 12px; }
+  .legend i { width:9px; height:9px; border-radius:3px; display:inline-block; }
+  .spacer { flex:1; }
+  #cmpToggle { font:inherit; font-size:13px; font-weight:600; color:#1c1c1c; background:#fff; border:1px solid #d8d8d2;
+               border-radius:999px; padding:7px 16px; cursor:pointer; transition:.15s; }
+  #cmpToggle:hover { border-color:#9a9a92; }
+  #cmpToggle.on { background:#1c1c1c; color:#fff; border-color:#1c1c1c; }
+  .hint { padding:6px 44px 0; font-size:12.5px; color:#8b8b83; }
+
+  /* ---------- chart ---------- */
+  .chart-outer { position:relative; margin:40px 120px 64px; height:660px; }
+  .axis-label { position:absolute; font-size:12px; letter-spacing:1.5px; color:#8fa09a; font-weight:600; white-space:nowrap; }
+  .axis-label .zh { letter-spacing:0; color:#a5b3ae; font-weight:500; }
+  .al-top    { top:-30px; left:50%; transform:translateX(-50%); }
+  .al-bottom { bottom:-32px; left:50%; transform:translateX(-50%); }
+  .al-left   { left:10px; top:calc(50% + 10px); }
+  .al-right  { right:10px; top:calc(50% + 10px); text-align:right; }
+
+  #chart { position:absolute; left:0; top:0; width:1080px; height:660px; transform-origin:0 0; }
+  .quad { position:absolute; width:50%; height:50%; }
+  .quad.TL { left:0; top:0; } .quad.TR { right:0; top:0; }
+  .quad.BL { left:0; bottom:0; } .quad.BR { right:0; bottom:0; }
+  .qlabel { position:absolute; max-width:250px; line-height:1.5; pointer-events:none; }
+  .qlabel .qn { font-size:12.5px; font-weight:700; letter-spacing:.5px; }
+  .qlabel .qd { font-size:11.5px; color:#98988f; margin-top:2px; }
+  .quad.TL .qlabel { right:16px; bottom:14px; text-align:right; }
+  .quad.TR .qlabel { left:16px; bottom:14px; text-align:left; }
+  .quad.BL .qlabel { right:16px; top:14px; text-align:right; }
+  .quad.BR .qlabel { left:16px; top:14px; text-align:left; }
+
+  .axis-h { position:absolute; left:-14px; right:-14px; top:50%; height:1px; background:#a9b6b1; }
+  .axis-v { position:absolute; top:-14px; bottom:-14px; left:50%; width:1px; background:#a9b6b1; }
+  .axis-h::before,.axis-h::after,.axis-v::before,.axis-v::after {
+    content:""; position:absolute; width:5px; height:5px; border-radius:50%; background:#a9b6b1; }
+  .axis-h::before { left:0; top:-2px; } .axis-h::after { right:0; top:-2px; }
+  .axis-v::before { top:0; left:-2px; } .axis-v::after { bottom:0; left:-2px; }
+
+  /* ---------- company cards ---------- */
+  .card { position:absolute; transform:translate(-50%,-50%); background:#fff; border:1px solid #e0e0da;
+          border-radius:4px; box-shadow:0 1px 3px rgba(30,30,20,.06); padding:11px 20px; cursor:pointer;
+          transition:transform .16s ease, box-shadow .16s ease, border-color .16s; user-select:none; z-index:5; }
+  .card:hover { transform:translate(-50%,-50%) scale(1.05); box-shadow:0 6px 18px rgba(30,30,20,.12); border-color:#c9c9c1; z-index:20; }
+  .card.picked { border-color:#1c1c1c; box-shadow:0 0 0 2px #1c1c1c, 0 6px 18px rgba(30,30,20,.12); }
+  .card .pick { position:absolute; top:-9px; right:-9px; width:20px; height:20px; border-radius:50%; background:#1c1c1c;
+                color:#fff; font-size:12px; line-height:20px; text-align:center; display:none; }
+  .card.picked .pick { display:block; }
+  .logo { display:inline-block; white-space:nowrap; font-size:15px; font-weight:600; letter-spacing:.4px; color:#1c1c1c; }
+
+  /* tooltip */
+  .tip { position:absolute; bottom:calc(100% + 10px); left:50%; transform:translateX(-50%); width:250px;
+         background:#fff; border:1px solid #ddd; border-radius:8px; box-shadow:0 8px 24px rgba(20,20,10,.14);
+         padding:10px 12px; font-size:12px; line-height:1.55; color:#44443f; display:none; pointer-events:none; z-index:40; }
+  .tip .t1 { font-weight:700; color:#1c1c1c; font-size:12.5px; }
+  .tip .t2 { color:#8b8b83; margin-top:2px; }
+  .card:hover .tip { display:block; }
+
+  /* ---------- compare bar ---------- */
+  #cmpBar { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#1c1c1c; color:#fff;
+            border-radius:999px; padding:9px 10px 9px 18px; display:none; align-items:center; gap:10px;
+            box-shadow:0 10px 30px rgba(0,0,0,.28); z-index:70; font-size:13px; max-width:92vw; }
+  #cmpBar.show { display:flex; }
+  #cmpBar .chip { background:#333; border-radius:999px; padding:4px 6px 4px 12px; display:flex; align-items:center; gap:8px; }
+  #cmpBar .chip button { background:none; border:none; color:#aaa; cursor:pointer; font-size:13px; padding:0 4px; }
+  #cmpBar .chip button:hover { color:#fff; }
+  #cmpBar .go { background:#fff; color:#1c1c1c; border:none; border-radius:999px; padding:7px 16px; font:inherit; font-weight:700; cursor:pointer; }
+  #cmpBar .go:disabled { opacity:.4; cursor:not-allowed; }
+  #cmpBar .clr { background:none; border:none; color:#999; font:inherit; cursor:pointer; text-decoration:underline; }
+
+  /* ---------- drawer ---------- */
+  #drawer { position:fixed; top:0; right:0; bottom:0; width:560px; max-width:94vw; background:#fff;
+            border-left:1px solid #e3e3dd; box-shadow:-12px 0 40px rgba(20,20,10,.10); z-index:60;
+            transform:translateX(103%); transition:transform .28s cubic-bezier(.3,.8,.3,1); overflow-y:auto; }
+  #drawer.open { transform:none; }
+  .d-inner { padding:30px 34px 48px; }
+  .d-close { position:sticky; top:14px; margin-left:100%; transform:translateX(-46px); width:32px; height:32px;
+             border-radius:50%; border:1px solid #ddd; background:#fff; cursor:pointer; font-size:15px; color:#666; z-index:5; }
+  .d-close:hover { background:#f2f2ee; color:#111; }
+  .d-head .logo { font-size:22px; }
+  .d-tag { margin-top:10px; font-size:14px; line-height:1.6; color:#44443f; }
+  .d-meta { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .d-meta .qtag { font-size:11.5px; font-weight:700; border-radius:999px; padding:3px 10px; }
+  .d-meta a { font-size:12.5px; color:#3B6EA5; text-decoration:none; }
+  .d-meta a:hover { text-decoration:underline; }
+  .ov { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#e8e8e2; border:1px solid #e8e8e2; border-radius:10px; overflow:hidden; margin-top:18px; }
+  .ov div { background:#FBFBF9; padding:11px 14px; }
+  .ov .k { font-size:11px; color:#98988f; letter-spacing:1px; }
+  .ov .v { font-size:13.5px; font-weight:700; margin-top:3px; line-height:1.45; }
+  .d-sec { margin-top:24px; }
+  .d-sec h3 { font-size:13px; font-weight:800; letter-spacing:1px; color:#1c1c1c; padding-bottom:7px;
+              border-bottom:1px solid #ecece6; margin-bottom:10px; }
+  .d-sec ul { list-style:none; }
+  .d-sec li { font-size:13px; line-height:1.65; color:#3c3c37; padding-left:14px; position:relative; margin-bottom:7px; }
+  .d-sec li::before { content:""; position:absolute; left:0; top:8px; width:5px; height:5px; border-radius:50%; background:#c8c8c0; }
+  .d-sec li .rn { font-weight:800; color:#1c1c1c; }
+  .prod { margin-bottom:10px; }
+  .prod .pn { font-size:13px; font-weight:800; color:#1c1c1c; }
+  .prod .pd { font-size:12.5px; line-height:1.6; color:#55554f; margin-top:2px; }
+
+  /* ---------- compare modal ---------- */
+  #cmpOverlay { position:fixed; inset:0; background:rgba(25,25,20,.38); display:none; align-items:center; justify-content:center; z-index:80; }
+  #cmpOverlay.show { display:flex; }
+  .cmp-box { background:#fff; border-radius:14px; width:min(1150px,94vw); max-height:88vh; overflow:auto; padding:26px 30px 30px; }
+  .cmp-box h2 { font-size:19px; font-weight:800; }
+  .cmp-box .x { float:right; border:1px solid #ddd; background:#fff; border-radius:50%; width:30px; height:30px; cursor:pointer; color:#666; }
+  .cmp-box table { border-collapse:collapse; width:100%; margin-top:16px; }
+  .cmp-box th,.cmp-box td { border:1px solid #e7e7e1; padding:9px 12px; font-size:12.5px; line-height:1.6; vertical-align:top; text-align:left; }
+  .cmp-box th.rowh { background:#FAFAF7; font-weight:700; width:96px; color:#55554f; white-space:nowrap; }
+  .cmp-box td.colh { background:#FAFAF7; font-weight:800; font-size:13.5px; }
+  .cmp-box td .num { color:#B4551F; }
+
+  footer { padding:8px 44px 40px; font-size:11.5px; color:#9a9a92; line-height:1.7; border-top:1px solid #e8e8e2; margin-top:10px; }
+
+  @media (max-width: 1000px) {
+    .chart-outer { margin:40px 20px 56px; }
+    header,.toolbar,.hint,footer { padding-left:24px; padding-right:24px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Mapping the Robotics Landscape</h1>
+  <div class="sub">按「模型通用度 × 身体形态（Embodiment）」整理的 11 家海外机器人公司 · 点击公司卡片查看详情 · 数据截至 2026 年 10 月</div>
+</header>
+
+<div class="toolbar">
+  <span class="legend"><i style="background:#C2703D"></i>部署运营类 DeployCos</span>
+  <span class="legend"><i style="background:#3B6EA5"></i>通用基础模型层</span>
+  <span class="legend"><i style="background:#3E7A52"></i>垂直场景软硬一体</span>
+  <span class="legend"><i style="background:#7A5BA6"></i>通用模型 × 特定本体</span>
+  <span class="spacer"></span>
+  <button id="cmpToggle">对比模式：关</button>
+</div>
+<div class="hint" id="hint">点击任意公司卡片，右侧滑出详情抽屉；开启「对比模式」后可勾选 2–3 家公司并排比较。</div>
+
+<div class="chart-outer">
+  <div class="axis-label al-top">GENERAL EMBODIMENT <span class="zh">· 通用身体形态</span></div>
+  <div class="axis-label al-bottom">SPECIFIC EMBODIMENT <span class="zh">· 特定身体形态</span></div>
+  <div id="chart">
+    <div class="axis-label al-left">SPECIFIC MODEL <span class="zh">· 特定模型</span></div>
+    <div class="axis-label al-right">GENERAL MODEL <span class="zh">· 通用模型</span></div>
+    <div class="axis-h"></div><div class="axis-v"></div>
+  </div>
+</div>
+
+<div id="cmpBar">
+  <span id="cmpChips" style="display:flex;gap:8px;flex-wrap:wrap;"></span>
+  <button class="go" id="cmpGo" disabled>开始对比</button>
+  <button class="clr" id="cmpClr">清空</button>
+</div>
+
+<aside id="drawer"><div class="d-inner" id="drawerBody"></div></aside>
+
+<div id="cmpOverlay"><div class="cmp-box" id="cmpBox"></div></div>
+
+<footer>
+  数据来源：《海外机器人公司信息整理》（2026-10）；象限格局参考 Lightspeed「Mapping the Robotics Landscape」（2026-10-08，Amber Yang × Claire Zau 对谈）。<br>
+  本页面仅作研究参考：公司为示例性、非穷尽列举，不构成排名、背书或投资建议。融资与估值数字以公开报道为准。
+</footer>
+
+<script>
+/* ============================== 数据 ============================== */
+const QUADS = {
+  TL:{name:"部署运营类 · DeployCos", desc:"不追通用模型，聚焦把机器人部署进真实场景持续运营", color:"#C2703D", tint:"rgba(194,112,61,.055)"},
+  TR:{name:"通用基础模型层", desc:"硬件无关的机器人基础模型，以 API / 授权交付", color:"#3B6EA5", tint:"rgba(59,110,165,.055)"},
+  BL:{name:"垂直场景软硬一体", desc:"自研本体 + 自研 AI，深耕物流 / 制造特定场景", color:"#3E7A52", tint:"rgba(62,122,82,.055)"},
+  BR:{name:"通用模型 × 特定本体", desc:"自研通用 AI 绑定人形 / 家庭等自研本体", color:"#7A5BA6", tint:"rgba(122,91,166,.06)"}
+};
+
+const COMPANIES = [
+{
+  id:"ultra", quad:"TL", x:24, y:13,
+  logo:'<span class="logo">Ultra</span>',
+  name:"Ultra Robotics", site:"https://ultra.tech",
+  founded:"2024 年（YC 2024 夏季批次）", hq:"美国纽约布鲁克林（注册地特拉华州）",
+  funding:"6,200 万美元", valuation:"未公开",
+  tagline:"多功能工业 AI 机器人：面向美国电商与 3PL 仓库，机器人已在真实仓库商业运行，目标大规模交付落地。",
+  rounds:[
+    {t:"A 轮 · 5,000 万美元", d:"Framework Ventures 领投，Y Combinator、Wing VC、M13、NextView Ventures 参与；用于扩大 OP1 产能、工程迭代、拓展仓库客户与现场实施团队。"},
+    {t:"种子轮 · 1,200 万美元", d:"Y Combinator 与 NextView Ventures 共同领投。"}
+  ],
+  team:["Jon Miller Schwartz（CEO）","Max Friefeld（COO）","Oliver Ortlieb（CTO）","Chetan Parthiban（首席科学家）","团队有 3D 打印制造创业经历，产品设计高度重视产线落地、现场维护与备件运维"],
+  products:[
+    {n:"OP1 多功能 AI 仓储机器人", d:"固定双臂、锁止脚轮人工推至工位；占地 5×5 英尺、作业区最大 10×10 英尺、垂直 0–10 英尺；普通美标 120V 市电（峰值 10A）、需 10Mbps 专用有线网络；单臂负载 10 磅（约 4.5kg）；无电池免充电，24 小时不间断作业；单台日处理约 <span class='num'>1000</span> 件货品。"}
+  ],
+  tech:["底层 AI 模型来自 Physical Intelligence（π0.6），基于真实仓库业务数据微调","完整仓库班次自主作业率 <span class='num'>96.4%</span>","AI 自适应货品规格多变、流程频繁调整的现实仓库工况","部署快：推到位、插电、开机，数小时投产，无需改造基建"],
+  scenarios:["订单包装（Order packing）","分拣（Sorting）","套件组配（Kitting）","拓展任务：退货处理、运单贴标、纸箱封箱"],
+  customers:["Highline Commerce（3PL，布鲁克林 Industry City，服务 200+ 消费品牌）：OP1 承担其 <span class='num'>30%</span> 电商订单打包履约","已在纽约、佐治亚、新泽西、得克萨斯多州仓库全年运行","截至 2026.10 机队累计完成超 <span class='num'>50 万</span>份订单打包；目标 2026 年底 100 处现场部署"],
+  business:["RaaS 机器人即服务：前期部署集成费 + 月度订阅（含硬件使用权、软件更新、全套运维）","官方提供 3 个月试用方案；早期试点客户支持按订单计费，后续可切换月订阅"],
+  milestones:["与 Highline 同园区早期 alpha 联合测试，直接在真实生产订单上迭代，跳过传统自动化 18–30 个月试点周期"],
+  sum:{products:"OP1 固定双臂 AI 仓储机器人（5×5ft 占地、单臂 10lb、120V 市电、免电池）",
+       tech:"基于 Physical Intelligence π0.6 微调；整班 96.4% 自主作业率；数小时部署投产",
+       scenarios:"电商 / 3PL 仓库：包装、分拣、套件组配、退货、贴标封箱",
+       business:"RaaS：前期部署费 + 月度订阅；3 个月试用；早期可按单计费",
+       customers:"Highline Commerce（承担 30% 订单打包）；多州仓库运行；累计 50 万+ 订单打包"}
+},
+{
+  id:"pi", quad:"TR", x:80, y:13,
+  logo:'<span class="logo">Physical Intelligence</span>',
+  name:"Physical Intelligence（π）", site:"https://www.pi.website",
+  founded:"2024 年", hq:"美国加州旧金山",
+  funding:"11 亿美元", valuation:"56 亿美元（B 轮投后）",
+  tagline:"「机器人领域的 OpenAI」：把通用大模型带入物理世界，打造硬件无关、可控制任意机器人的通用基础模型。",
+  rounds:[
+    {t:"种子轮 · 4 亿美元", d:"投后估值 24 亿美元。"},
+    {t:"B 轮 · 6 亿美元", d:"CapitalG（Alphabet 成长基金）领投，投后估值 56 亿美元。"},
+    {t:"投资方", d:"Jeff Bezos、OpenAI、Sequoia 红杉、Khosla Ventures、Lux Capital、Thrive Capital、NVentures（英伟达）、T. Rowe Price 等。"}
+  ],
+  team:["Karol Hausman（CEO）：前 Google DeepMind 资深研究科学家，RT-1 / RT-2 / SayCan 核心作者","Sergey Levine：UC Berkeley 教授","Chelsea Finn：斯坦福大学教授","Brian Ichter、Quan Vuong、Adnan Esmail：前 DeepMind 机器人研究员","Lachy Groom（联合创始人）：前 Stripe 高管，负责商业运营"],
+  products:[
+    {n:"π0（2024.10）", d:"首个通用策略模型：支持 7 种机器人硬件、覆盖 50+ 操作任务；2025 年 2 月开源权重与代码。"},
+    {n:"π0.5", d:"开放世界泛化：控制移动机械手完成厨房、卧室清理整理等陌生场景任务。"},
+    {n:"π0.6", d:"Ultra Robotics OP1 商用部署采用版本；真实订单打包整班自主作业率 96.4%；引入现场自主试错与人工修正的强化学习，大幅提升柔性抓取与软包装处理。"},
+    {n:"π0.7（2026.4）", d:"可引导式任务执行、增强长时序记忆，支持 10 分钟以上连续作业与复杂组合任务泛化。"},
+    {n:"Pi API Beta（2026.10）", d:"开放模型 API 公测：第三方厂商上传自有现场数据在线微调，云端推理部署到自有硬件。"}
+  ],
+  tech:["VLA 路线：摄像头图像 + 自然语言指令 → 关节实时动作，无需逐类物品编程","硬件无关：同一模型适配双臂工作站、移动机械臂、人形机器人","长时序记忆：记住任务中间状态","真实数据持续迭代：现场作业数据回流微调，越用越聪明"],
+  scenarios:["家务：叠衣服、厨房操作、整理收纳","工业：零部件装配、物料分拣、柔性物料处理","实验室：多种机械手与人形机器人操作任务"],
+  customers:["Ultra Robotics OP1 商用机队采用 π0.6"],
+  business:["输出机器人 AI 模型、API 接口、模型微调服务；不制造机器人本体","向硬件厂商授权模型收取模型 / API 服务费，让硬件厂商专注结构与运维"],
+  milestones:["团队源自 Google DeepMind RT 系列机器人大模型核心研发班底"],
+  sum:{products:"π0 / π0.5 / π0.6 / π0.7 VLA 基础模型 + Pi API Beta（2026.10）",
+       tech:"硬件无关、语言指令驱动、长时序记忆；π0 已开源；π0.6 整班自主率 96.4%",
+       scenarios:"仓储打包、家务、工业装配分拣、实验室多形态机器人",
+       business:"模型授权 / API / 微调服务；不造机器人本体",
+       customers:"Ultra Robotics OP1 商用部署采用 π0.6"}
+},
+{
+  id:"skild", quad:"TR", x:62, y:28,
+  logo:'<span class="logo">Skild AI</span>',
+  name:"Skild AI", site:"https://www.skild.ai",
+  founded:"2023 年", hq:"美国宾夕法尼亚匹兹堡（另设湾区、班加罗尔办公室）",
+  funding:"22 亿美元", valuation:"超 140 亿美元（C 轮投后）",
+  tagline:"Physical AI / Omni-Bodied 全形态智能：一套统一 AI 大脑控制任意形态机器人，跨硬件、跨任务泛化。",
+  rounds:[
+    {t:"种子轮（2023）· 1,450 万美元", d:"—"},
+    {t:"A 轮（2024.7）· 3 亿美元", d:"Lightspeed、Coatue 领投；软银、Jeff Bezos、Sequoia、亚马逊工业创新基金等参与；投后估值 15 亿美元；公司正式走出隐身。"},
+    {t:"B 轮（2025 夏）· 约 5 亿美元", d:"软银领投，NVIDIA、三星等参与；投后估值约 45 亿美元。"},
+    {t:"C 轮（2026.1）· 14 亿美元", d:"软银领投；NVentures、Macquarie Capital、Jeff Bezos 参与；战略投资方 LG、施耐德电气、Salesforce Ventures、CommonSpirit；投后估值超 140 亿美元。"}
+  ],
+  team:["Deepak Pathak（CEO）：前卡内基梅隆大学教授，机器人学习知名学者","Abhinav Gupta（联合创始人）：前 CMU 教授，计算机视觉与机器人专家","成员来自 Anduril、Tesla、NVIDIA、Meta、Google、Amazon 及 CMU、斯坦福等"],
+  products:[
+    {n:"Skild Brain（初代基础模型）", d:"统一机器人基础模型：VLA 架构，支持从人类视频演示学习；四足、人形、桌面臂、移动操作机器人多硬件适配；技能以 API 交付。"},
+    {n:"S1（2026.8，当前主力）", d:"上下文学习型基础模型：仅凭一段人类演示视频即可完成从未见过的新任务，无需重训；支持约 10 分钟连续多步骤任务；示例：盆栽移栽、煎饼制作、手冲咖啡、套件组装。"}
+  ],
+  tech:["跨硬件泛化（Omni-bodied）：同一模型直接适配人形、四足、固定臂、移动机械手","视频模仿学习：用互联网人类动作视频预训练，破解机器人数据稀缺","数据飞轮：现场部署数据回流自增强","API 封装技能抽象：抓取、导航、递物即调即用"],
+  scenarios:["安全巡检平台：工厂、数据中心、工地，四足机器人湿滑复杂地形自主导航","移动操作平台：抓取、递送、自主导航","自主打包平台：仓库重复性打包、柔性物料","工业 / 工厂装配：无需逐类产品重编程"],
+  customers:["富士康、三井等工业合作伙伴落地 S1","2026.4 收购斑马技术（Zebra Technologies）机器人业务，获得 Symmetry 履约调度平台，打通仓库端到端履约自动化"],
+  business:["模型软件 / API 服务商，不造硬件；向 OEM 与工业客户提供模型授权、API、定制微调","与 ABB、Universal Robots、MiR 等联合部署"],
+  milestones:["分阶段落地：半结构化场景（工厂、仓库、巡检）→ 医院、酒店 → 家庭"],
+  sum:{products:"Skild Brain 基础模型 → S1（2026.8：一段演示视频完成新任务）",
+       tech:"Omni-Bodied 跨硬件泛化；人类视频模仿学习；10 分钟长时序；技能 API 封装",
+       scenarios:"安全巡检、移动操作、自主打包、工业装配",
+       business:"模型 / API 授权 + 定制微调；与 ABB、UR、MiR 联合部署",
+       customers:"富士康、三井；2026.4 收购 Zebra 机器人业务（Symmetry 平台）"}
+},
+{
+  id:"generalist", quad:"TR", x:86, y:28,
+  logo:'<span class="logo">Generalist</span>',
+  name:"Generalist", site:"https://generalistai.com",
+  founded:"2024 年", hq:"美国加州圣马特奥（旧金山湾区）",
+  funding:"超 5.28 亿美元", valuation:"20 亿美元（B 轮投后）",
+  tagline:"We train robots that work：从零原生训练物理交互基础模型，验证机器人缩放定律，迈向物理 AGI。",
+  rounds:[
+    {t:"A 轮 · 1.28 亿美元", d:"—"},
+    {t:"B 轮（2026.6）· 4 亿美元", d:"Radical Ventures 领投；新增 8VC、Union Square Ventures、Norwest、Hanabi Capital；原有 NVIDIA NVentures、Bezos Expeditions、Boldstart、Spark Capital、NFDG 加码；天使含李飞飞、Bin Lin、Naval Ravikant；投后估值 20 亿美元。"}
+  ],
+  team:["Pete Florence（CEO）：前 Google DeepMind 资深科学家，RT-2、PaLM-E 核心成员","Andy Zeng（联合创始人）：前 DeepMind 机器人研究员，操作与 sim2real 方向","Andy Barry（联合创始人）：前 DeepMind 工程师，负责系统与数据基础设施"],
+  products:[
+    {n:"GEN-0（2025.11）", d:"初代具身基础模型：首次证明机器人领域存在缩放定律；NVIDIA GTC 大会仅几天准备即部署到 UR 机械臂 + MiR 底盘的全新平台完成演示。"},
+    {n:"GEN-1（2026.4，商业化主力）", d:"实时多模态原生具身模型：多样化灵巧操作成功率 <span class='num'>99%</span>，执行速度较此前行业最优提升约 3 倍，约 1 小时现场数据即可完成适配。"},
+    {n:"GEN-1.5（2026.8）", d:"One-Shot 单样本上下文学习：仅 12 秒人类演示视频、不做梯度更新即学会新任务；1–10 次梯度更新可基于几分钟数据快速适配；支持多样化末端执行器（「千手机器」）；零样本 sim2real。"}
+  ],
+  tech:["原生具身架构：非 LLM 外挂动作模块，从物理交互多模态数据从零训练","硬件与抓手无关：跨本体、跨末端执行器迁移","缩放定律：数据与算力扩大 → 能力可预测提升","涌现即兴问题解决能力"],
+  scenarios:["工业制造：零部件灵巧装配、物料处理","仓储物流：分拣、打包、柔性物料抓取","实验室自动化","餐饮、农业","长期：家庭家务、太空作业"],
+  customers:["NVIDIA GTC 现场演示验证陌生硬件快速适配；开放 GEN-1.5 候补名单申请接入"],
+  business:["纯软件模型服务商，不造本体：模型授权、API 调用、现场微调、部署支持","与协作机器人厂商联合测试落地"],
+  milestones:["自建宣称全球规模最大的机器人预训练物理交互数据集"],
+  sum:{products:"GEN-0 / GEN-1 / GEN-1.5 原生具身基础模型",
+       tech:"从零原生训练验证缩放定律；GEN-1 成功率 99%、提速 3 倍；GEN-1.5 12 秒 one-shot",
+       scenarios:"工业制造、仓储物流、实验室、餐饮农业；长期家庭与太空",
+       business:"纯软件模型服务：授权 / API / 现场微调；GEN-1.5 候补名单",
+       customers:"NVIDIA GTC 现场演示（UR 臂 + MiR 底盘快速适配）"}
+},
+{
+  id:"reward", quad:"TR", x:74, y:42,
+  logo:'<span class="logo">Reward AI</span>',
+  name:"Reward AI", site:"https://www.rewardai.com",
+  founded:"2025 年", hq:"美国加州旧金山湾区（员工 11–50 人）",
+  funding:"未公开", valuation:"未公开",
+  tagline:"One Model, One Data Interface, Any Body：一套模型、一套数据接口、适配任意本体；先达到人类操作效率，再超越。",
+  rounds:[{t:"融资信息", d:"未公开披露；2026 年 9 月 14 日正式走出隐身模式并发布首个模型 OM-1。"}],
+  team:["Zipeng Fu（CEO、联合创始人）：斯坦福 AI 实验室博士（2.5 年毕业，导师 Chelsea Finn），前 Google DeepMind 研究员；代表作 Mobile ALOHA、HumanPlus、Robot Parkour Learning、Open X-Embodiment","Chen Wang（CTO、联合创始人）：斯坦福计算机博士（导师李飞飞、Karen Liu），上海交大本科；代表作 DexCap、MimicPlay、VoxPoser；DexCap 是 Omnibody Hand 的原型基础"],
+  products:[
+    {n:"Omnibody Hand（可穿戴采集硬件）", d:"自研 7 自由度动作捕捉手套：视觉惯性 + 电磁跟踪、触觉、接近传感、手部相机；高速运动下电磁跟踪平均超调误差下降 60%（67cm/s 场景误差 24.9mm → 9.5mm）；佩戴手套自然演示即输出多模态训练数据，无需遥操作。"},
+    {n:"OM-1（2026-09-14 发布）", d:"旗舰通用操作策略模型：仅用 Omnibody Hand 人类演示数据训练，零遥操作、零真机数据；统一策略直接部署桌面臂 / 工业臂 / 人形；多模态按原生采样频率处理；内置独立时钟 RL 高频控制层抵御负载扰动；全新任务仅需不到 <span class='num'>30 分钟</span>人类演示即可掌握。"}
+  ],
+  tech:["训练数据源完全不同：全部来自人类穿戴采集，打破模型绑定特定硬件采集数据的范式","跨本体泛化：同一 OM-1 策略桌面臂、工业臂、人形直接复用","单阶段统一训练：无预训练 + 微调两段式，数据持续积累复用","双时钟架构：上层策略感知决策 + 底层 RL 高频控制独立运行"],
+  scenarios:["仓储物流：打包、柔性物料、分拣、套件组装","工业制造：零部件装配、精密拧螺丝、拾取摆放","通用灵巧：整理、叠衣、调酒、样品处理","长期：人形全身操作、多机器人协同"],
+  customers:["商业化早期：尚无公开付费 API 与落地客户，以技术演示与寻找硬件合作伙伴为主"],
+  business:["全栈具身智能方案：自研采集硬件 + 操作策略模型；不造机器人本体","模型授权、定制采集服务、部署技术支持"],
+  milestones:["2026-09-14 走出隐身并发布 OM-1"],
+  sum:{products:"OM-1 通用操作策略模型（2026.9）+ Omnibody Hand 7 自由度采集手套",
+       tech:"仅人类手套数据训练、零遥操作；One Model Any Body；双时钟 RL 控制；<30 分钟演示掌握新任务",
+       scenarios:"仓储打包分拣、工业精密装配、通用灵巧操作；长期多机器人协同",
+       business:"模型授权 / 定制采集 / 部署支持；商业化早期，尚无付费 API",
+       customers:"2026-09-14 走出隐身发布 OM-1；暂无公开落地客户"}
+},
+{
+  id:"dexterity", quad:"BL", x:30, y:62,
+  logo:'<span class="logo">Dexterity</span>',
+  name:"Dexterity", site:"https://dexterity.ai",
+  founded:"2017 年（斯坦福机器人实验室衍生）", hq:"美国加州红木城（东京设办公室）",
+  funding:"约 2.65 亿美元", valuation:"约 16.6 亿美元（2026.5 C-1 轮投后，独角兽）",
+  tagline:"企业级 Physical AI：难点不是速度而是灵巧的物理智能；解决真实仓库长尾非结构化工况，强调生产级落地。",
+  rounds:[
+    {t:"累计约 2.65 亿美元", d:"C-1 轮（2026 年 5 月）投后估值约 16.6 亿美元，达独角兽级别。"},
+    {t:"重要投资方", d:"住友商事（战略投资 + 日本合资方，持日本独家分销权）、Kleiner Perkins、Lightspeed、Bessemer 等。"}
+  ],
+  team:["Samir Menon（创始人 & CEO）：斯坦福计算机博士，研究方向机器人控制与仿真","Robert Sun（联合创始人、创始工程师）","Kevin Chavez（联合创始人、创始工程师）：Foresight 世界模型核心负责人","团队源自斯坦福机器人实验室；截至 2025 年拥有 80 余项专利"],
+  products:[
+    {n:"Mech 工业超人形双臂移动机器人", d:"单臂最大 65 磅、双臂合计 130 磅；最高放置 8 英尺；四轮独立转向可在货车车厢内自主移动；最多 16 台 3D 相机 + 全套力触觉传感；与 ASRock Rack 联合定制机载 AI 超算、全本地边缘推理；工作温度 0–50℃。"},
+    {n:"Foresight（世界模型）", d:"物理环境推理、预测物体交互、长期任务规划；生产环境决策速度 <span class='num'>&lt;400ms</span>；2026 年开放 Foresight API Challenge 与「Truck Loading Game」线上 demo。"},
+    {n:"Instinct（触觉接触智能）", d:"基于力反馈与接触物理特性处理物体；与 Foresight 双向协同；一个完整班次触发力控模块超 <span class='num'>2000</span> 次，处理纸箱挤压、位置偏移等现实工况。"}
+  ],
+  tech:["三维空间 + 时间联合推理：预测包裹堆叠、挤压、碰撞，优化摆放与空间利用率","高层规划（Foresight）+ 底层力控（Instinct）双向闭环","边缘算力本地推理，不依赖云端，规避断网与延迟风险"],
+  scenarios:["卡车 / 集装箱自动装卸（标杆业务）","码垛 & 拆垛","包裹分拣、分离（parcel singulation）","货架取货、订单拣选"],
+  customers:["FedEx：Hagerstown 枢纽拖车自动装载，计划扩展至美国多枢纽；已在 FedEx 投资者大会现场演示","Sagawa Express 佐川急便：东京 X Frontier 转运中心现场验证（经 Dexterity-SC Japan 合资公司）"],
+  business:["软硬一体：自研 Mech + Foresight/Instinct 全栈","RaaS 为主、支持设备采购；含硬件使用权、软件迭代、现场运维与故障保障","日本市场由合资公司 Dexterity-SC Japan 销售交付"],
+  milestones:["2021 首次完全自主机器人抓取","2022 首个财富 500 强正式部署（卡车装载）","2024 成立日本合资公司","2026 发布 Foresight；生产环境累计超 1 亿次自主决策、零安全事故"],
+  sum:{products:"Mech 移动双臂机器人（双臂 130lb、8ft 堆高、边缘算力）+ Foresight 世界模型 + Instinct 触觉",
+       tech:"Foresight 决策 <400ms；Instinct 每班 2000+ 次力控；累计 1 亿+ 自主决策、零安全事故",
+       scenarios:"卡车 / 集装箱装卸、码垛拆垛、包裹分拣、货架拣选",
+       business:"软硬一体：RaaS 为主 + 设备采购；日本由合资公司交付",
+       customers:"FedEx（Hagerstown 枢纽）、佐川急便；住友商事战略投资 + 日本独家分销"}
+},
+{
+  id:"tacta", quad:"BL", x:19, y:78,
+  logo:'<span class="logo">Tacta Systems</span>',
+  name:"Tacta Systems", site:"https://www.tactasystems.com",
+  founded:"2022 年（2025.6 走出隐身）", hq:"美国加州帕洛阿尔托（2026.9 设新加坡生产基地）",
+  funding:"7,500 万美元", valuation:"未公开",
+  tagline:"以触觉为核心的工业灵巧操作：仿真 90% 成功率的任务落地真实工业仅 12%，短板是人类级触觉。",
+  rounds:[
+    {t:"种子轮 · 1,100 万美元", d:"Matter Venture Partners 领投。"},
+    {t:"A 轮 · 6,400 万美元", d:"America's Frontier Fund、SBVA（软银旗下）联合领投；Matter、B Capital、Woven Capital（丰田）、EDBI（新加坡经发局）、Sojitz 双日、Yazaki 矢崎、CDIB-TEN、B5 Capital、Tyche 等参与。"}
+  ],
+  team:["Andreas Bibl（联合创始人、执行董事长）：连续硬科技创业者，曾创立 Micro-LED 企业 LuxVue（被苹果收购）","Vikram Pavate（联合创始人、CEO）：材料工程背景、沃顿 MBA；曾创办 Locix；数十项专利","Nahid Harjee（VP-Sensing）：传感方向负责人","团队创业成果曾被苹果、富士胶片、洛克希德·马丁收购"],
+  products:[
+    {n:"Tacta Hand 工业级人形灵巧机械手", d:"人手同等大小；自研流体肌腱驱动；15 个独立驱动关节；可承受数百万次工业循环；指尖集成 Tacta Sensor 阵列。"},
+    {n:"Tacta Sensor 自研触觉传感器", d:"微型触觉阵列：感知力、剪切力、接触、滑移、材质纹理、温度；可检测螺丝咬合、线缆绷紧、零件打滑，官方称可感知蚂蚁爬行级微小接触。"},
+    {n:"Tacta Glove 技能采集手套", d:"指尖搭载与机械手完全相同的传感器：工人自然干活即采集触觉 + 运动多模态数据；无需代码、无需遥操作、无需真机演示。"},
+    {n:"Tacta Dexterous AI 灵巧智能模型", d:"物理 AI 基础模型 + 独有大规模触觉多模态数据集；作业中持续收集新触觉数据、持续学习；处理连接器插入、螺丝紧固、精细对位、线缆装配等高难度力控操作。"}
+  ],
+  tech:["硬件–AI 深度一体化：机械手、传感器、手套、模型全栈自研","机械手与采集手套同款传感器：人类演示与机器人执行感知域 1:1 对齐","非遥操作式技能采集，规避动作变形与力反馈失真","面向百万次工厂循环的工业可靠性设计"],
+  scenarios:["电子制造","AI 算力基础设施硬件组装","汽车零部件制造"],
+  customers:["计划 2027 年初向电子、汽车、AI 基础设施行业头部客户部署；截至 2026-10 处于客户试点前期"],
+  business:["整套 TactaBot 平台销售（机械手 + 传感 + 手套 + AI 授权）：硬件销售 + 软件订阅","订阅含模型更新、技能训练工具包、技术支持；新加坡基地面向亚太供货"],
+  milestones:["2025-06 走出隐身并公布 7,500 万美元融资","2026-07-27 正式发布 TactaBot 完整平台","2026-09 新加坡生产基地落地"],
+  sum:{products:"TactaBot 平台：Tacta Hand 灵巧手 + Sensor 触觉阵列 + Glove 采集手套 + Dexterous AI",
+       tech:"机械手与手套同款传感器 1:1 感知对齐；流体肌腱 15 关节；蚂蚁爬行级接触感知",
+       scenarios:"电子制造、AI 算力硬件组装、汽车零部件等精密装配",
+       business:"整套平台硬件销售 + 软件订阅；新加坡基地供亚太",
+       customers:"计划 2027 年初向头部制造客户部署（试点前期）"}
+},
+{
+  id:"reflex", quad:"BL", x:37, y:88,
+  logo:'<span class="logo">Reflex Robotics</span>',
+  name:"Reflex Robotics", site:"https://www.reflexrobotics.com",
+  founded:"2022 年（2024.3 首发产品）", hq:"美国纽约市",
+  funding:"700 万美元（种子轮）", valuation:"未公开",
+  tagline:"放弃双足腿部的务实路线：轮式底盘 + 可伸缩脊柱 + 双臂；监督式自主，开箱即用接入现有仓库设施。",
+  rounds:[
+    {t:"种子轮（2024）· 700 万美元", d:"Khosla Ventures 领投；Dropbox、Cruise 创始人参与投资。"}
+  ],
+  team:["Ritesh Ragavender（CEO、联合创始人）","Seongdo Kim（联合创始人）","Abdo Babuk（联合创始人）","成员来自 MIT、Boston Dynamics、Tesla、Oculus、ASML、Waymo、Skydio、Anduril"],
+  products:[
+    {n:"Reflex 轮式双臂移动机器人", d:"2×2 英尺紧凑底盘、零半径转向；可垂直伸缩脊柱覆盖地面到高层货架；单臂负载 25 磅（约 11.3kg）；多台机载相机 + 深度视觉 + 全套机载算力；目标单价约 <span class='num'>$32,000</span>（宣称比双足人形低 20 倍）；支持多班次连续作业。"}
+  ],
+  tech:["监督式自主（Supervised Autonomy）：机器人尽量自主，异常时远程操作员介入","监督可靠性层：实时上传现场画面，卡料 / 未知物体场景快速接管，产线不停工","数据闭环引擎：监督作业数据回流训练，自主占比持续提升、人工干预递减","兼容现有手推车、扫码枪、触摸屏、货架，无需改造产线"],
+  scenarios:["3PL / 电商仓 / 分销中心：托盘码垛拆垛、袋装重物搬运、开箱装箱封箱、货架高低位存取","工厂车间：原材料搬运、半成品上下料","长期：零售门店、后勤物料"],
+  customers:["仓库运营商、制造业工厂、第三方物流企业（试点推进中）"],
+  business:["软硬一体：硬件销售 + 月度软件订阅；亦提供 RaaS","月度服务成本目标显著低于同岗位人工，投资回报周期约 1 年"],
+  milestones:["2024 年 3 月首次对外发布机器人产品"],
+  sum:{products:"Reflex 轮式双臂机器人（2×2ft 底盘、伸缩脊柱、单臂 25lb、目标单价 $32,000）",
+       tech:"监督式自主：远程操作员异常接管 + 数据闭环持续提升自主占比",
+       scenarios:"3PL / 电商仓码垛拆垛、袋装重物搬运、开箱封箱、货架存取",
+       business:"硬件销售 + 月度订阅 / RaaS；目标回报周期约 1 年",
+       customers:"2024.3 首发产品；仓库试点推进中"}
+},
+{
+  id:"sunday", quad:"BR", x:66, y:62,
+  logo:'<span class="logo">Sunday</span>',
+  name:"Sunday Robotics", site:"https://www.sunday.ai",
+  founded:"2023 年（2025 走出隐身）", hq:"美国加州旧金山湾区",
+  funding:"数亿美元（B 轮）", valuation:"独角兽级（具体未公开）",
+  tagline:"行业最大瓶颈是物理交互数据：400 美元手套让人类在家做家务采集数据，打破「无机器人则无数据」死循环。",
+  rounds:[{t:"B 轮 · 累计数亿美元", d:"硅谷知名 VC 投资，已达独角兽估值；用于 Memo 硬件迭代、ACT 模型研发、手套量产与家庭试点。"}],
+  team:["Tony Zhao（赵子豪，CEO、联合创始人）：斯坦福博士","成员来自 Google DeepMind、特斯拉、Apple 机器人团队"],
+  products:[
+    {n:"Memo 家用机器人", d:"轮式底盘 + 可升降双臂（非双足）；最低贴地、最高伸展 7 英尺、常规工作高度 4 英尺；77kg；22+ 自由度、双臂各 7 自由度、双手 4 指；最大速度 1m/s（限速人类步行）；续航 4 小时、1 小时快充、Beta 版自动回充；手部 IP67 / 小臂 IP66；机载 GPU 本地运行 ACT 模型。"},
+    {n:"Skill Capture Glove 技能采集手套", d:"手部结构与 Memo 机械手完全同构；成本仅 <span class='num'>$400</span>（远低于传统遥操作设备）；采集手部姿态、力信号、视觉画面；已向全球开发者寄出超 <span class='num'>2000</span> 副。"},
+    {n:"ACT 系列具身基础模型", d:"ACT-1（2025-11）：完全基于人类手套演示数据训练、零机器人本体数据；端到端视觉输入直接输出全身动作；ACT-2（2026-07）：陌生家庭环境叠衣零样本成功率宣称 <span class='num'>99.1%</span>，少量样本即可学新任务。"}
+  ],
+  tech:["零真机数据训练范式：人类手套多模态演示即全部训练源","跨陌生家庭环境泛化","机器人在真实家庭作业中持续补充少量真机数据迭代"],
+  scenarios:["餐具处理：收餐盘杯子、清残渣、装洗碗机","咖啡制作：操作意式咖啡机","洗衣：分拣、折叠、处理袜子","家庭杂物整理、桌面清理"],
+  customers:["2026 年启动 Memo 家庭 Beta 试点：向入选家庭投放机器人收集真实家庭数据"],
+  business:["软硬一体：Memo 整机销售 + ACT 模型 AI 软件订阅","早期家庭 Beta 试点迭代，后续面向消费家庭大规模销售"],
+  milestones:["2025-11 发布 ACT-1","2026-07 发布 ACT-2","2026 启动 Memo 家庭 Beta"],
+  sum:{products:"Memo 家用机器人（轮式 + 升降双臂、77kg、续航 4h）+ $400 采集手套 + ACT-1/ACT-2",
+       tech:"仅人类手套数据训练；ACT-2 陌生家庭叠衣零样本 99.1%；已寄出 2000+ 副手套",
+       scenarios:"家庭：餐具处理、咖啡制作、洗衣折叠、杂物整理",
+       business:"Memo 整机销售 + ACT 软件订阅；家庭 Beta 试点中",
+       customers:"2026 启动 Memo 家庭 Beta 试点计划"}
+},
+{
+  id:"1x", quad:"BR", x:62, y:78,
+  logo:'<span class="logo">1X</span>',
+  name:"1X Technologies", site:"https://www.1x.tech",
+  founded:"2014 年（原名 Halodi Robotics，2023 更名）", hq:"美国加州帕洛阿尔托（制造基地：加州海沃德 + 挪威莫斯）",
+  funding:"超 2.5 亿美元", valuation:"未公开",
+  tagline:"安全是第一约束：专利肌腱驱动 + 全身柔性外壳，让双足人形机器人真正走进家庭与人类共处。",
+  rounds:[
+    {t:"累计超 2.5 亿美元", d:"核心投资方：OpenAI Startup Fund、Sandwater、Northzone、淡马锡等；OpenAI 同时是 AI 技术合作伙伴，提供大模型与世界模型能力支持。"}
+  ],
+  team:["Bernt Øivind Børnich（CEO & 创始人）：挪威机器人工程师，深耕柔性驱动、肌腱传动十余年","成员来自挪威科技大学、工业自动化、机器人控制、具身 AI 领域"],
+  products:[
+    {n:"NEO 旗舰家用双足人形机器人", d:"身高约 1.8m、自重 29.9kg；柔性 3D 晶格聚合物软外壳、无夹点、HIC <span class='num'>&lt;250</span> 碰撞安全；自研肌腱驱动 95% 反向驱动、扭矩精度 2%、重复定位 0.1mm、标称寿命 200 万次循环；可举重 68kg、持续负载 24.9kg；运行噪音仅 22dB；双 8.85MP 90Hz 立体鱼眼相机；手部 IP68 / 机身 IP44；Nvidia Jetson Thor（最高 2070 FP4 TFLOPS）；WiFi / 蓝牙 / 5G。"},
+    {n:"EVE 初代轮式企业机器人（2018）", d:"1.86m、86kg、轮式底盘；负载 15kg、续航 6 小时；面向企业后勤：开门、设备搬运、安防巡检。"}
+  ],
+  tech:["端到端具身神经网络 + 世界模型：预测动作带来的环境变化、提前规避碰撞与倾倒","VLA 结合 OpenAI 大模型：自然语言指令驱动多步骤任务","人在回路兜底：家庭未知长尾工况远程操作员介入","家庭数据闭环：NEO 作业数据持续迭代模型"],
+  scenarios:["家庭家务：整理房间、收拾杂物、洗衣辅助、餐具收纳、冲咖啡、吸尘、拾取搬运","长期：办公室、仓库轻量后勤"],
+  customers:["早期 Beta 试点家庭；2025 开启家庭预订并公布售价与订阅方案"],
+  business:["软硬一体：整机销售 <span class='num'>$20,000</span>，或按月订阅 <span class='num'>$499/月</span> RaaS 模式"],
+  milestones:["2018 EVE 发布","2022 OpenAI Startup Fund 领投","2024 NEO Beta","2025 NEO Gamma 量产版 + 家庭预订","2026 海沃德垂直集成工厂投产（美国首个人形机器人垂直工厂）；收购 Kind Humanoid 补强灵巧手"],
+  sum:{products:"NEO 家用双足人形（1.8m / 29.9kg、肌腱驱动、22dB）+ EVE 轮式企业机器人",
+       tech:"柔性晶格外壳 HIC<250 碰撞安全；95% 反向驱动肌腱；Jetson Thor 2070 TFLOPS；OpenAI 大模型协同",
+       scenarios:"家庭家务优先；长期办公室 / 仓库轻量后勤",
+       business:"整机 $20,000 或 $499/月订阅；早期 Beta 家庭",
+       customers:"2026 海沃德工厂投产；收购 Kind Humanoid；OpenAI Startup Fund 投资"}
+},
+{
+  id:"figure", quad:"BR", x:85, y:88,
+  logo:'<span class="logo">Figure</span>',
+  name:"Figure AI", site:"https://www.figure.ai",
+  founded:"2022 年 5 月", hq:"美国加州桑尼维尔（硅谷）",
+  funding:"超 7 亿美元", valuation:"未公开",
+  tagline:"通用双足人形机器人：先落地仓库工厂、再拓展家庭；自研硬件 + Index 众包数据平台双轮驱动。",
+  rounds:[
+    {t:"累计超 7 亿美元", d:"投资方包括 OpenAI、微软、英伟达、宝马、亚马逊等；用于人形硬件迭代、Helix 模型训练、Index 数据平台与工厂试点。"}
+  ],
+  team:["Brett Adcock（创始人 & CEO）：连续创业者，航空硬件背景","团队汇聚大量来自波士顿动力、特斯拉、谷歌、亚马逊的机器人工程师与 AI 研究员"],
+  products:[
+    {n:"Figure 03（最新旗舰）", d:"全尺寸双足人形、刚性机身、高扭矩关节，可不平整地面行走与越障；新一代视觉架构：帧率翻倍、延迟降低 75%、视场扩大 60%；手掌内置广角相机（主相机被遮挡仍持续视觉反馈）；柔性触觉自适应指尖；机载高性能边缘算力本地运行 Helix。"},
+    {n:"Figure 01 / 02", d:"01（2023）：初代原型实现稳定双足行走；02（2024）：面向仓库作业、双臂灵巧手，开展真实仓库试点（纸箱抓取码垛）。"}
+  ],
+  tech:["Helix 端到端 VLA 物理 AI 模型：环境推理、物体识别、长时序规划、零样本泛化；Helix 2.5 在 30 个陌生家庭冷启动测试零样本成功率 <span class='num'>56%</span>","Index 全球众包数据平台（iOS/Android）：付费招募普通人录制家务与手工视频训练 Helix"],
+  scenarios:["仓库：码垛拆垛、纸箱搬运、货架取放","家庭：家务整理、物品搬运"],
+  customers:["2024 年起开展真实仓库试点；早期面向工业客户"],
+  business:["软硬一体：人形整机销售 + Helix AI 软件订阅","工业试点为主，RaaS 作为备选方案"],
+  milestones:["Index 平台覆盖 <span class='num'>108</span> 个国家、累计 <span class='num'>264 万</span>下载、已向创作者支付 <span class='num'>1500 万</span>美元；每秒接收 30 分钟以上人类操作视频；每 1000 小时数据含 373 种任务、1146 种物体、116 种环境"],
+  sum:{products:"Figure 01/02/03 双足人形 + Helix VLA 模型 + Index 众包数据平台",
+       tech:"Helix 2.5 陌生家庭零样本 56%；Index 覆盖 108 国、264 万下载、每秒 30 分钟视频",
+       scenarios:"仓库码垛拆垛、纸箱搬运；家庭家务整理",
+       business:"整机销售 + Helix 软件订阅；工业试点为主、RaaS 备选",
+       customers:"2024 起真实仓库试点；投资方含 OpenAI、微软、英伟达、宝马、亚马逊"}
+}
+];
+
+/* ============================== 渲染 ============================== */
+const chart = document.getElementById('chart');
+
+// 象限底色与定义
+Object.entries(QUADS).forEach(([k,q])=>{
+  const d = document.createElement('div');
+  d.className = 'quad ' + k;
+  d.style.background = q.tint;
+  d.innerHTML = `<div class="qlabel"><div class="qn" style="color:${q.color}">${q.name}</div><div class="qd">${q.desc}</div></div>`;
+  chart.appendChild(d);
+});
+
+// 公司卡片
+COMPANIES.forEach(c=>{
+  const el = document.createElement('div');
+  el.className = 'card'; el.id = 'card-' + c.id;
+  el.style.left = c.x + '%'; el.style.top = c.y + '%';
+  el.innerHTML = `<span class="pick">✓</span>${c.logo}
+    <div class="tip">
+      <div class="t1">${c.name}</div>
+      <div class="t2">${c.founded} · ${c.hq}</div>
+      <div class="t2">累计融资：${c.funding}${c.valuation!=='未公开' ? ' ｜ 估值：'+c.valuation : ''}</div>
+      <div style="margin-top:4px">${c.tagline}</div>
+    </div>`;
+  el.addEventListener('click', ()=> compareMode ? togglePick(c.id) : openDrawer(c.id));
+  chart.appendChild(el);
+});
+
+/* ---------- 抽屉 ---------- */
+const drawer = document.getElementById('drawer');
+const drawerBody = document.getElementById('drawerBody');
+
+function sec(title, items, cls){
+  if(!items || !items.length) return '';
+  return `<div class="d-sec"><h3>${title}</h3><ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`;
+}
+function openDrawer(id){
+  const c = COMPANIES.find(x=>x.id===id);
+  const q = QUADS[c.quad];
+  drawerBody.innerHTML = `
+    <button class="d-close" onclick="closeDrawer()">✕</button>
+    <div class="d-head">${c.logo}</div>
+    <div class="d-tag">${c.tagline}</div>
+    <div class="d-meta">
+      <span class="qtag" style="background:${q.color}1f;color:${q.color}">${q.name}</span>
+      <a href="${c.site}" target="_blank" rel="noopener">${c.site.replace('https://','')}</a>
+    </div>
+    <div class="ov">
+      <div><div class="k">成立时间</div><div class="v">${c.founded}</div></div>
+      <div><div class="k">总部</div><div class="v">${c.hq}</div></div>
+      <div><div class="k">累计融资</div><div class="v">${c.funding}</div></div>
+      <div><div class="k">估值</div><div class="v">${c.valuation}</div></div>
+    </div>
+    <div class="d-sec"><h3>融资历程</h3><ul>${c.rounds.map(r=>`<li><span class="rn">${r.t}</span>${r.d && r.d!=='—' ? ' — '+r.d : ''}</li>`).join('')}</ul></div>
+    ${sec('创始团队', c.team)}
+    <div class="d-sec"><h3>核心产品与技术</h3>${c.products.map(p=>`<div class="prod"><div class="pn">${p.n}</div><div class="pd">${p.d}</div></div>`).join('')}</div>
+    ${sec('技术特点', c.tech)}
+    ${sec('应用场景', c.scenarios)}
+    ${sec('客户与落地', c.customers)}
+    ${sec('商业模式', c.business)}
+    ${sec('里程碑', c.milestones)}
+  `;
+  drawer.classList.add('open');
+  drawer.scrollTop = 0;
+}
+function closeDrawer(){ drawer.classList.remove('open'); }
+
+/* ---------- 对比模式 ---------- */
+let compareMode = false, picked = [];
+const cmpToggle = document.getElementById('cmpToggle');
+const cmpBar = document.getElementById('cmpBar');
+const cmpChips = document.getElementById('cmpChips');
+const cmpGo = document.getElementById('cmpGo');
+const hint = document.getElementById('hint');
+
+cmpToggle.addEventListener('click', ()=>{
+  compareMode = !compareMode;
+  cmpToggle.classList.toggle('on', compareMode);
+  cmpToggle.textContent = '对比模式：' + (compareMode ? '开' : '关');
+  hint.textContent = compareMode
+    ? '对比模式已开启：点击公司卡片勾选（最多 3 家），再点「开始对比」并排查看。'
+    : '点击任意公司卡片，右侧滑出详情抽屉；开启「对比模式」后可勾选 2–3 家公司并排比较。';
+  if(!compareMode){ picked = []; syncPicked(); }
+  renderBar();
+});
+function togglePick(id){
+  const i = picked.indexOf(id);
+  if(i>=0) picked.splice(i,1);
+  else { if(picked.length>=3){ alert('最多同时对比 3 家公司'); return; } picked.push(id); }
+  syncPicked(); renderBar();
+}
+function syncPicked(){ COMPANIES.forEach(c=> document.getElementById('card-'+c.id).classList.toggle('picked', picked.includes(c.id))); }
+function renderBar(){
+  cmpBar.classList.toggle('show', compareMode && picked.length>0);
+  cmpChips.innerHTML = picked.map(id=>{
+    const c = COMPANIES.find(x=>x.id===id);
+    return `<span class="chip">${c.name}<button onclick="togglePick('${id}')">✕</button></span>`;
+  }).join('');
+  cmpGo.disabled = picked.length < 2;
+}
+document.getElementById('cmpClr').addEventListener('click', ()=>{ picked=[]; syncPicked(); renderBar(); });
+
+/* ---------- 对比表 ---------- */
+const cmpOverlay = document.getElementById('cmpOverlay');
+const cmpBox = document.getElementById('cmpBox');
+cmpGo.addEventListener('click', ()=>{
+  const cols = picked.map(id=>COMPANIES.find(x=>x.id===id));
+  const rows = [
+    ['象限定位', c=>QUADS[c.quad].name],
+    ['一句话定位', c=>c.tagline],
+    ['成立', c=>c.founded],
+    ['总部', c=>c.hq],
+    ['累计融资', c=>c.funding],
+    ['估值', c=>c.valuation],
+    ['核心产品', c=>c.sum.products],
+    ['技术亮点', c=>c.sum.tech],
+    ['应用场景', c=>c.sum.scenarios],
+    ['商业模式', c=>c.sum.business],
+    ['客户 / 里程碑', c=>c.sum.customers]
+  ];
+  cmpBox.innerHTML = `<button class="x" onclick="closeCompare()">✕</button><h2>公司对比（${cols.length} 家）</h2>
+    <table><tr><th class="rowh"></th>${cols.map(c=>`<td class="colh">${c.name}</td>`).join('')}</tr>
+    ${rows.map(([label,fn])=>`<tr><th class="rowh">${label}</th>${cols.map(c=>`<td>${fn(c)}</td>`).join('')}</tr>`).join('')}
+    </table>`;
+  cmpOverlay.classList.add('show');
+});
+function closeCompare(){ cmpOverlay.classList.remove('show'); }
+cmpOverlay.addEventListener('click', e=>{ if(e.target===cmpOverlay) closeCompare(); });
+
+/* ---------- 键盘 ---------- */
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ closeCompare(); closeDrawer(); }
+});
+
+/* ---------- 自适应缩放 ---------- */
+const outer = document.querySelector('.chart-outer');
+function fitChart(){
+  const s = Math.min(1, outer.clientWidth / 1080);
+  chart.style.transform = 'scale(' + s + ')';
+  outer.style.height = Math.round(660 * s) + 'px';
+}
+window.addEventListener('resize', fitChart);
+fitChart();
+</script>
+</body>
+</html>
